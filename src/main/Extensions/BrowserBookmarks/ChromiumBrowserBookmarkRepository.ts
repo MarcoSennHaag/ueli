@@ -3,29 +3,28 @@ import type { BrowserBookmark } from "./BrowserBookmark";
 import type { BrowserBookmarkRepository } from "./BrowserBookmarkRepository";
 import { ChromiumBrowserBookmark } from "./ChromiumBrowserBookmark";
 
-type BookmarkItem = {
-    children: BookmarkItem[];
-    guid: string;
-    name: string;
-    type: "folder" | "url";
-    url?: string;
-};
+type BookmarkItem = { children: BookmarkItem[]; guid: string; name: string; type: "folder" | "url"; url?: string };
 
 type BookmarksFileContent = { roots: { bookmark_bar: BookmarkItem; other: BookmarkItem } };
 
 export class ChromiumBrowserBookmarkRepository implements BrowserBookmarkRepository {
     public constructor(
         private readonly fileSystemUtility: FileSystemUtility,
-        private readonly bookmarksFilePathResolver: () => string,
+        private readonly bookmarksFilePathResolver: () => string[],
     ) {}
 
     public async getAll(): Promise<BrowserBookmark[]> {
-        const jsonFilePath = this.bookmarksFilePathResolver();
-        const fileContent = await this.fileSystemUtility.readJsonFile<BookmarksFileContent>(jsonFilePath);
-        const bookmarkBarBookmarks = this.getBookmarksFromItem(fileContent.roots.bookmark_bar);
-        const otherBookmarks = this.getBookmarksFromItem(fileContent.roots.other);
+        const jsonFilePaths = this.bookmarksFilePathResolver();
+        let bookmarks: ChromiumBrowserBookmark[] = [];
 
-        return [...bookmarkBarBookmarks, ...otherBookmarks];
+        for (const jsonFilePath of jsonFilePaths) {
+            const fileContent = await this.fileSystemUtility.readJsonFile<BookmarksFileContent>(jsonFilePath);
+            const bookmarkBarBookmarks = this.getBookmarksFromItem(fileContent.roots.bookmark_bar);
+            const otherBookmarks = this.getBookmarksFromItem(fileContent.roots.other);
+            bookmarks = bookmarks.concat(bookmarkBarBookmarks, otherBookmarks);
+        }
+
+        return bookmarks;
     }
 
     private getBookmarksFromItem(item: BookmarkItem): ChromiumBrowserBookmark[] {
